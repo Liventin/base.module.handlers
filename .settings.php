@@ -7,13 +7,12 @@ $moduleId = basename(__DIR__);
 return [
     'services' => [
         'value' => [
-            $moduleId . '.options.service' => [
-                'className' => Base\Module\Src\Options\OptionsService::class,
+            $moduleId . '.handlers.service' => [
+                'className' => Base\Module\Src\Handlers\HandlersService::class,
                 'constructorParams' => [
                     $moduleId
                 ],
             ],
         ],
-        'readonly' => true,
     ],
 ];
