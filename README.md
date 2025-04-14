@@ -1,5 +1,13 @@
 # base.module.handlers
 
+<table>
+<tr>
+<td>
+<a href="https://github.com/Liventin/base.module">Bitrix Base Module</a>
+</td>
+</tr>
+</table>
+
 install | update
 
 ```
@@ -19,4 +27,5 @@ redirect (optional)
   "service-redirect": {
     "liventin/base.module.handlers": "module.name",
   }
-},
+}
+```
