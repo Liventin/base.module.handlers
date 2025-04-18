@@ -29,3 +29,21 @@ redirect (optional)
   }
 }
 ```
+
+PhpStorm Live Template 
+```php
+<?php
+namespace ${MODULE_PROVIDER_CAMMAL_CASE}\\${MODULE_CODE_CAMMAL_CASE}\Handlers;
+
+use ${MODULE_PROVIDER_CAMMAL_CASE}\\${MODULE_CODE_CAMMAL_CASE}\Service\Handlers\Handler;
+
+class HandlerExample
+{
+    #[Handler(module: 'main', event: 'OnBeforeUserAdd')]
+    public static function onUserAdd(array &${DS}fields): void
+    {
+        // logic
+    }
+}
+
+```
