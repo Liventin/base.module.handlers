@@ -133,9 +133,16 @@ class HandlersService implements IHandlersService
                         continue;
                     }
 
+                    if (method_exists($className, $handler->event)) {
+                        $func = $className . '::' . $handler->event;
+                        $event = $func();
+                    } else {
+                        $event = $handler->event;
+                    }
+
                     $this->handlers[] = [
                         'module' => $handler->module,
-                        'event' => $handler->event,
+                        'event' => $event,
                         'sort' => $handler->sort,
                         'class' => $className,
                         'method' => $method->getName(),
