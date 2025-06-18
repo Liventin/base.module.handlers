@@ -12,14 +12,8 @@ install | update
 
 ```
 "require": {
-    "liventin/base.module.handlers": "dev-main"
+    "liventin/base.module.handlers": "^1.0.0"
 }
-"repositories": [
-    {
-      "type": "vcs",
-      "url": "git@github.com:liventin/base.module.handlers"
-    }
-]
 ```
 redirect (optional)
 ```
