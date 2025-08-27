@@ -5,10 +5,7 @@
 namespace Base\Module\Install;
 
 
-use Bitrix\Main\ObjectNotFoundException;
-use Bitrix\Main\SystemException;
-use Psr\Container\NotFoundExceptionInterface;
-use ReflectionException;
+use Base\Module\Exception\ModuleException;
 use Base\Module\Service\Tool\ClassList;
 use Base\Module\Install\Interface\Install;
 use Base\Module\Install\Interface\UnInstall;
@@ -20,10 +17,7 @@ class HandlersInstaller implements Install, UnInstall, ReInstall
 {
     /**
      * @return array
-     * @throws NotFoundExceptionInterface
-     * @throws ObjectNotFoundException
-     * @throws ReflectionException
-     * @throws SystemException
+     * @throws ModuleException
      */
     private function getHandlers(): array
     {
@@ -33,10 +27,8 @@ class HandlersInstaller implements Install, UnInstall, ReInstall
     }
 
     /**
-     * @throws NotFoundExceptionInterface
-     * @throws ObjectNotFoundException
-     * @throws ReflectionException
-     * @throws SystemException
+     * @return void
+     * @throws ModuleException
      */
     public function install(): void
     {
@@ -46,10 +38,9 @@ class HandlersInstaller implements Install, UnInstall, ReInstall
     }
 
     /**
-     * @throws NotFoundExceptionInterface
-     * @throws ObjectNotFoundException
-     * @throws ReflectionException
-     * @throws SystemException
+     * @param bool $saveData
+     * @return void
+     * @throws ModuleException
      */
     public function unInstall(bool $saveData): void
     {
@@ -59,10 +50,8 @@ class HandlersInstaller implements Install, UnInstall, ReInstall
     }
 
     /**
-     * @throws NotFoundExceptionInterface
-     * @throws ObjectNotFoundException
-     * @throws ReflectionException
-     * @throws SystemException
+     * @return void
+     * @throws ModuleException
      */
     public function reInstall(): void
     {
