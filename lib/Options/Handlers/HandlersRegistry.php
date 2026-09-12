@@ -12,14 +12,6 @@ use Base\Module\Src\Options\Providers\TableProvider;
 use Bitrix\Main\EventManager;
 use Bitrix\Main\Localization\Loc;
 
-/**
- * Опция-таблица: реестр обработчиков модуля.
- *
- * Строка каждого обработчика модуля (из опции event_handlers, которую пишет
- * HandlersService::install()) раскрывается: под ней таблица ВСЕХ зарегистрированных
- * в системе обработчиков этого события (EventManager::findEventHandlers), с сортировкой
- * по приоритету (SORT) и подсветкой собственных обработчиков модуля.
- */
 class HandlersRegistry implements Option
 {
     public static function getId(): string
@@ -84,10 +76,6 @@ class HandlersRegistry implements Option
     }
 
     /**
-     * Все обработчики системы на каждое событие запрашиваются у EventManager
-     * ОДИН раз (по уникальной паре «модуль:событие»), сохраняются в $registry
-     * и переиспользуются для статуса и раскрываемых строк всех обработчиков.
-     *
      * @return array
      */
     private static function collectRows(): array
@@ -107,14 +95,8 @@ class HandlersRegistry implements Option
         }
 
         $eventManager = EventManager::getInstance();
-
-        // Ядро кэширует обработчики (managed cache, TTL 3600с). Сбрасываем кэш,
-        // чтобы реестр показывал актуальное состояние b_module_to_module
-        // (например, после ручного редактирования таблицы в админке) без ожидания
-        // истечения TTL. findEventHandlers ниже перечитает данные из БД заново.
         $eventManager->clearLoadedHandlers();
 
-        // Один запрос на уникальное событие, результат переиспользуем.
         $registry = [];
         foreach ($handlers as $handler) {
             $key = self::getEventKey($handler);
@@ -150,9 +132,6 @@ class HandlersRegistry implements Option
     }
 
     /**
-     * Все обработчики системы на событие (включая чужие модули).
-     * Порядок — по приоритету: EventManager::findEventHandlers уже сортирует по SORT.
-     *
      * @param array $eventHandlers
      * @param string $moduleId
      * @return array
@@ -163,12 +142,9 @@ class HandlersRegistry implements Option
 
         foreach ($eventHandlers as $item) {
             $isSelf = (string)($item['TO_MODULE_ID'] ?? '') === $moduleId;
-
-            // Приоритет источника: класс/метод из БД -> файл (TO_PATH) ->
-            // имя runtime-обработчика (TO_NAME, у него нет класса/метода) ->
-            // «пустая» зависимость (ядро просто подключает модуль).
             $class = (string)($item['TO_CLASS'] ?? '');
             $method = (string)($item['TO_METHOD'] ?? '');
+            
             if (!empty($item['TO_PATH'] ?? '')) {
                 $class = (string)$item['TO_PATH'];
             } elseif ($class === '' && $method === '') {
@@ -197,8 +173,6 @@ class HandlersRegistry implements Option
     }
 
     /**
-     * Зарегистрирован ли обработчик модуля среди переданных обработчиков события.
-     *
      * @param array $eventHandlers
      * @param array $handler
      * @param string $moduleId
