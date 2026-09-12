@@ -27,6 +27,14 @@ class HandlersService implements IHandlersService
     }
 
     /**
+     * @return string
+     */
+    public function getModuleId(): string
+    {
+        return $this->moduleId;
+    }
+
+    /**
      * @return void
      * @throws ArgumentOutOfRangeException
      * @throws SystemException
@@ -87,7 +95,12 @@ class HandlersService implements IHandlersService
         $this->install();
     }
 
-    private function getStoredHandlers(): array
+    /**
+     * Сохранённые при установке обработчики модуля (из опции event_handlers).
+     *
+     * @return array
+     */
+    public function getStoredHandlers(): array
     {
         $serialized = Option::get($this->moduleId, self::OPTION_NAME);
         if (empty($serialized)) {

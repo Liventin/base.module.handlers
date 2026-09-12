@@ -10,4 +10,6 @@ interface HandlersService
     public function install(): void;
     public function unInstall(bool $saveData): void;
     public function reInstall(): void;
+    public function getStoredHandlers(): array;
+    public function getModuleId(): string;
 }
