@@ -1,0 +1,245 @@
+<?php
+
+namespace Base\Module\Options\Handlers;
+
+use Base\Module\Exception\ModuleException;
+use Base\Module\Options\TabHandlers;
+use Base\Module\Service\Container;
+use Base\Module\Service\Options\Option;
+use Base\Module\Service\Options\OptionsService;
+use Base\Module\Service\Handlers\HandlersService as IHandlersService;
+use Base\Module\Src\Options\Providers\TableProvider;
+use Bitrix\Main\EventManager;
+use Bitrix\Main\Localization\Loc;
+
+/**
+ * Опция-таблица: реестр обработчиков модуля.
+ *
+ * Строка каждого обработчика модуля (из опции event_handlers, которую пишет
+ * HandlersService::install()) раскрывается: под ней таблица ВСЕХ зарегистрированных
+ * в системе обработчиков этого события (EventManager::findEventHandlers), с сортировкой
+ * по приоритету (SORT) и подсветкой собственных обработчиков модуля.
+ */
+class HandlersRegistry implements Option
+{
+    public static function getId(): string
+    {
+        return 'handlers_registry';
+    }
+
+    public static function getName(): string
+    {
+        return Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_TITLE');
+    }
+
+    public static function getType(): string
+    {
+        return 'table';
+    }
+
+    public static function getTabId(): string
+    {
+        return TabHandlers::getId();
+    }
+
+    public static function getSort(): int
+    {
+        return 100;
+    }
+
+    /**
+     * @return array
+     * @throws ModuleException
+     */
+    public static function getParams(): array
+    {
+        /** @var OptionsService $srvOptions */
+        $srvOptions = Container::get(OptionsService::SERVICE_CODE);
+        /** @var TableProvider $provider */
+        $provider = $srvOptions->getProvider(self::getType());
+
+        if (!$provider) {
+            return [];
+        }
+
+        return $provider
+            ->setColumns([
+                Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_COL_MODULE'),
+                Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_COL_EVENT'),
+                Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_COL_CLASS'),
+                Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_COL_METHOD'),
+                Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_COL_STATUS'),
+                Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_COL_SORT'),
+            ])
+            ->setChildColumns([
+                Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_COL_MODULE'),
+                Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_COL_CLASS'),
+                Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_COL_METHOD'),
+                Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_COL_SORT'),
+            ])
+            ->setRows(self::collectRows())
+            ->setEmpty(Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_EMPTY'))
+            ->setExpandLabel(Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_EXPAND'))
+            ->getParamsToArray();
+    }
+
+    /**
+     * Все обработчики системы на каждое событие запрашиваются у EventManager
+     * ОДИН раз (по уникальной паре «модуль:событие»), сохраняются в $registry
+     * и переиспользуются для статуса и раскрываемых строк всех обработчиков.
+     *
+     * @return array
+     */
+    private static function collectRows(): array
+    {
+        $rows = [];
+
+        /** @var IHandlersService $handlersService */
+        $handlersService = self::getHandlersService();
+        if ($handlersService === null) {
+            return $rows;
+        }
+
+        $moduleId = $handlersService->getModuleId();
+        $handlers = $handlersService->getStoredHandlers();
+        if (empty($handlers)) {
+            return $rows;
+        }
+
+        $eventManager = EventManager::getInstance();
+
+        // Ядро кэширует обработчики (managed cache, TTL 3600с). Сбрасываем кэш,
+        // чтобы реестр показывал актуальное состояние b_module_to_module
+        // (например, после ручного редактирования таблицы в админке) без ожидания
+        // истечения TTL. findEventHandlers ниже перечитает данные из БД заново.
+        $eventManager->clearLoadedHandlers();
+
+        // Один запрос на уникальное событие, результат переиспользуем.
+        $registry = [];
+        foreach ($handlers as $handler) {
+            $key = self::getEventKey($handler);
+            if (!isset($registry[$key])) {
+                $registry[$key] = $eventManager->findEventHandlers($handler['module'], $handler['event']);
+            }
+        }
+
+        foreach ($handlers as $handler) {
+            $key = self::getEventKey($handler);
+            $eventHandlers = $registry[$key] ?? [];
+            $selfRegistered = self::isSelfRegistered($eventHandlers, $handler, $moduleId);
+
+            $rows[] = [
+                'cells' => [
+                    $handler['module'],
+                    $handler['event'],
+                    $handler['class'],
+                    $handler['method'],
+                    ['text' => Loc::getMessage(
+                            $selfRegistered
+                                ? 'MODULE_OPTION_HANDLERS_REGISTRY_STATUS_YES'
+                                : 'MODULE_OPTION_HANDLERS_REGISTRY_STATUS_NO'
+                        ), 'status' => $selfRegistered ? 'ok' : 'no'],
+                    (int)$handler['sort'],
+                ],
+                'highlight' => true,
+                'children' => self::collectEventRows($eventHandlers, $moduleId),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Все обработчики системы на событие (включая чужие модули).
+     * Порядок — по приоритету: EventManager::findEventHandlers уже сортирует по SORT.
+     *
+     * @param array $eventHandlers
+     * @param string $moduleId
+     * @return array
+     */
+    private static function collectEventRows(array $eventHandlers, string $moduleId): array
+    {
+        $rows = [];
+
+        foreach ($eventHandlers as $item) {
+            $isSelf = (string)($item['TO_MODULE_ID'] ?? '') === $moduleId;
+
+            // Приоритет источника: класс/метод из БД -> файл (TO_PATH) ->
+            // имя runtime-обработчика (TO_NAME, у него нет класса/метода) ->
+            // «пустая» зависимость (ядро просто подключает модуль).
+            $class = (string)($item['TO_CLASS'] ?? '');
+            $method = (string)($item['TO_METHOD'] ?? '');
+            if (!empty($item['TO_PATH'] ?? '')) {
+                $class = (string)$item['TO_PATH'];
+            } elseif ($class === '' && $method === '') {
+                $name = (string)($item['TO_NAME'] ?? '');
+                if ($name !== '') {
+                    $parts = explode('::', $name, 2);
+                    $class = $parts[0];
+                    $method = $parts[1] ?? '';
+                } else {
+                    $class = Loc::getMessage('MODULE_OPTION_HANDLERS_REGISTRY_INCLUDE_MODULE');
+                }
+            }
+
+            $rows[] = [
+                'cells' => [
+                    (string)($item['TO_MODULE_ID'] ?? ''),
+                    $class,
+                    $method,
+                    (int)($item['SORT'] ?? 0),
+                ],
+                'highlight' => $isSelf,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Зарегистрирован ли обработчик модуля среди переданных обработчиков события.
+     *
+     * @param array $eventHandlers
+     * @param array $handler
+     * @param string $moduleId
+     * @return bool
+     */
+    private static function isSelfRegistered(array $eventHandlers, array $handler, string $moduleId): bool
+    {
+        foreach ($eventHandlers as $item) {
+            if ((string)($item['TO_MODULE_ID'] ?? '') !== $moduleId) {
+                continue;
+            }
+            if ((string)($item['TO_CLASS'] ?? '') === $handler['class'] &&
+                (string)($item['TO_METHOD'] ?? '') === $handler['method']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array $handler
+     * @return string
+     */
+    private static function getEventKey(array $handler): string
+    {
+        return (string)$handler['module'] . '|' . (string)$handler['event'];
+    }
+
+    /**
+     * @return IHandlersService|null
+     */
+    private static function getHandlersService(): ?IHandlersService
+    {
+        try {
+            if (!Container::has(IHandlersService::SERVICE_CODE)) {
+                return null;
+            }
+            return Container::get(IHandlersService::SERVICE_CODE);
+        } catch (ModuleException) {
+            return null;
+        }
+    }
+}
