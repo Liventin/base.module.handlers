@@ -1,6 +1,6 @@
 <?php
 
-namespace Base\Module\Options\Handlers;
+namespace Base\Module\Options\TabHandlers;
 
 use Base\Module\Exception\ModuleException;
 use Base\Module\Options\TabHandlers;
