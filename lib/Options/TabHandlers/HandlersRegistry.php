@@ -208,9 +208,6 @@ class HandlersRegistry implements Option
     private static function getHandlersService(): ?IHandlersService
     {
         try {
-            if (!Container::has(IHandlersService::SERVICE_CODE)) {
-                return null;
-            }
             return Container::get(IHandlersService::SERVICE_CODE);
         } catch (ModuleException) {
             return null;
