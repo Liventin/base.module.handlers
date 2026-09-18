@@ -205,7 +205,7 @@ class HandlersRegistry implements Option
     /**
      * @return IHandlersService|null
      */
-    private static function getHandlersService(): ?IHandlersService
+    private static function getHandlersService(): mixed
     {
         try {
             return Container::get(IHandlersService::SERVICE_CODE);
